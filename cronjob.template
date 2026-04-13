@@ -1,4 +1,3 @@
-# This is a cronjob template that will be modified by the entrypoint script
-# The schedule is replaced by the environment variable
-
-${CRON_SCHEDULE} /usr/local/bin/python /app/app.py >> /config/cron.log 2>&1
+# Run once per minute; scheduler_tick.py decides whether the configured cron
+# expression is due and prevents overlapping runs.
+* * * * * /usr/local/bin/python /app/scheduler_tick.py >> /app/runtime/cron.log 2>&1

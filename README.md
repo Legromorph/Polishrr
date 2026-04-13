@@ -1,39 +1,53 @@
-# 🎬 Polishrr
+# Polishrr
 
-This Python script automatically identifies and upgrades movies and TV episodes in **Radarr** and **Sonarr** based on their **Custom Format Scores**.  
+Polishrr upgrades Radarr movies and Sonarr episodes that are still below the configured Custom Format cutoff.
+It can run on a schedule, exposes a small web dashboard, and keeps manual upgrade actions available for review and intervention.
 
-It helps you keep your media library at the highest possible quality — without manual effort.
+## What It Does
 
----
+### Radarr
+- Loads monitored movies with an existing file.
+- Compares the current `customFormatScore` with the movie profile `cutoffFormatScore`.
+- Tags randomly selected candidates and triggers `MoviesSearch`.
+- Resets the upgrade tag cycle once all relevant movies are already tagged.
 
-## 🚀 How It Works
+### Sonarr
+- Resolves monitored episodes through their owning series and episode files.
+- Compares the current file score with the series profile `cutoffFormatScore`.
+- Tags the series, triggers `EpisodeSearch` for the selected episode IDs, and resets the cycle once all current candidate series are already tagged.
 
-### 🔹 Radarr
-- The script fetches all movies from your Radarr library.  
-- For each movie, it checks:
-  - Is the movie **monitored**?  
-  - Does it have an existing **file**?  
-  - Is its **custom format score** below the required `cutoffFormatScore`?  
-- If so, the movie is marked for upgrade and a **search command** is triggered in Radarr.  
-- Movies that already have the **upgrade tag** (default: `upgrade-cf`) are **skipped**.  
-- Once **all movies** are tagged, the script removes the tag from every movie — restarting the upgrade cycle.
+## Runtime Model
 
-### 🔹 Sonarr
-- Works similarly to Radarr, but on the **episode** level:  
-  - Episodes with a lower quality score than required are tagged and queued for search.  
+- `/config/.env` stores the ARR connection settings and default runtime values.
+- `/config/settings.json` stores dashboard-managed settings and overrides the scheduling and per-run limits.
+- Cron runs `scheduler_tick.py` once per minute.
+- `scheduler_tick.py` evaluates the configured cron expression and only starts a run when the current minute matches.
+- The web dashboard runs through FastAPI and Uvicorn.
 
----
+This means dashboard changes are not cosmetic anymore. Saved settings affect the next scheduled run.
 
-## ⚙️ Configuration
+## Security Model
 
-The script reads all settings from a `.env` file (expected path: `/config/.env`).
+- Dashboard login uses the `POLISHRR_TOKEN` once and then switches to an HttpOnly session cookie.
+- The token is no longer stored in browser storage.
+- Server-Sent Events are authenticated as well.
+- Optional IP filtering is supported via `ALLOWED_IPS`.
+- Forwarded proxy headers are only trusted for the IPs listed in `FORWARDED_ALLOW_IPS`.
+- Session login attempts are rate-limited in memory.
+- The frontend renders API data through DOM APIs instead of injecting raw HTML.
 
-Example configuration:
+## Configuration
+
+Main config file: `/config/.env`
+
+Example:
 
 ```env
-# General settings
+# General
 LOG_LEVEL=INFO
 UPGRADE_TAG=upgrade-cf
+CRON_SCHEDULE=0 * * * *
+FORCE_ENABLED=false
 
 # Radarr
 PROCESS_RADARR=true
@@ -46,139 +60,104 @@ PROCESS_SONARR=true
 SONARR_URL=http://localhost:8989
 SONARR_API_KEY=your_sonarr_api_key
 NUM_EPISODES_TO_UPGRADE=3
+
+# Web service
+POLISHRR_TOKEN=replace_me_with_a_long_random_secret
+ALLOWED_IPS=192.168.1.0/24,10.0.0.0/8
+WEB_SERVICE_PORT=8998
+WEB_SERVICE_BIND=0.0.0.0
+FORWARDED_ALLOW_IPS=127.0.0.1
+SESSION_TTL_HOURS=12
+COOKIE_SECURE=false
+LOGIN_WINDOW_SECONDS=300
+MAX_FAILED_LOGINS=10
 ```
 
-## 🧩 Process Overview
+Notes:
+- Use `COOKIE_SECURE=true` when the dashboard is served through HTTPS.
+- `FORCE_ENABLED=true` is required before force-upgrade actions are accepted.
+- Dashboard settings are persisted in `/config/settings.json`.
 
-1. Load all environment variables.  
-2. Ensure the upgrade tag (`UPGRADE_TAG`) exists in Radarr/Sonarr.  
-3. Identify all upgrade candidates (below cutoff score).  
-4. Randomly select a few and mark them with the upgrade tag.  
-5. Trigger search commands to fetch better versions.  
-6. Skip already tagged items.  
-7. If **everything** is tagged → remove all tags → restart cycle.  
+## Docker
 
----
-
-## 🪵 Logging
-
-All events are logged to `/config/output_YYYY-MM-DD.log`.  
-Example log output:
-
-```
-2025-10-07 14:23:12 [INFO] Starting Radarr upgrade process
-2025-10-07 14:23:12 [INFO] Tagged movie 'Inception' with 'upgrade-cf'
-2025-10-07 14:23:12 [INFO] Triggered Radarr search command.
-```
-
-
-You can adjust the log level via the `LOG_LEVEL` environment variable (e.g. `DEBUG`, `INFO`, `WARNING`).
-
----
-
-## 🐳 Docker installation
-
-You can run **Polishrr** using Docker with the following configuration:
+Example `docker-compose.yml`:
 
 ```yaml
 services:
   polishrr:
-    image: ghcr.io/legromorph/polishrr:latest
+    image: ghcr.io/legromorph/polishrr:with-web
     container_name: polishrr
     environment:
-      - CRON_SCHEDULE=0 * * * *   # default: run at every full hour
-      - TZ=America/Los_Angeles    # set your desired timezone
+      - CRON_SCHEDULE=0 * * * *
+      - TZ=Europe/Berlin
+      - POLISHRR_TOKEN=<LONG_SECRET_TOKEN>
+      - FORWARDED_ALLOW_IPS=127.0.0.1
+      - ALLOWED_IPS=192.168.1.0/24
     volumes:
-      - /path/to/config:/config   # place your .env file here
+      - /path/to/config:/config
+    ports:
+      - "8998:8998"
+    restart: unless-stopped
 ```
 
-## ▶️ Run the Script
+Build locally:
 
-# Automatic Run
-
-The script runs automatically based on the **CRON_SCHEDULE** environment variable.
-
-Default: 0 * * * * → runs every full hour
-
-You can customize this value to any valid cron expression.
-
-# Manual Run
-
-If you want to run the script manually inside the container:
 ```bash
-docker exec -it polishrr python app.py
+docker build -t polishrr:local .
 ```
 
-Or, if running locally:
+Run locally:
+
+```bash
+docker run --rm -p 8998:8998 -v /path/to/config:/config \
+  -e POLISHRR_TOKEN=replace_me \
+  polishrr:local
+```
+
+## Manual Usage
+
+Run one cycle locally:
+
 ```bash
 python app.py
 ```
 
-By default, both Radarr and Sonarr processes run:
-```python
-run_radarr_upgrade()
-run_sonarr_upgrade()
+Run inside the container:
+
+```bash
+docker exec -it polishrr python /app/app.py
 ```
 
-To disable one, modify your .env:
-```env
-PROCESS_RADARR=true
-PROCESS_SONARR=false
+Open the dashboard:
+
+```text
+http://localhost:8998/
 ```
 
----
+At first login, enter the configured `POLISHRR_TOKEN`.
 
-## 🌐 New: Polishrr Web Dashboard (v1.0)
+## Logs
 
-Polishrr now includes a **modern, browser-based dashboard** for full visibility and control — no command line required.
+- Application log: `/app/runtime/output_YYYY-MM-DD.log`
+- Scheduler log: `/app/runtime/cron.log`
 
----
+## GHCR Publishing
 
-### ✨ Main Features
+Tag and build:
 
-#### 🧭 Overview
-- Displays current **upgrade summaries** for Radarr and Sonarr.  
-- Shows **below-cutoff** and **eligible items** in real time.
+```bash
+docker build -t ghcr.io/<owner>/polishrr:with-web .
+```
 
-#### ⚙️ Manual Control
-- Start upgrades manually for **Radarr**, **Sonarr**, or both.  
-- Trigger **single upgrades** or **force upgrades** directly from the interface.
+Login and push:
 
-#### 🔄 Live Updates
-- Real-time logs via **Server-Sent Events (SSE)**.  
-- Instant feedback when upgrades start, finish, or fail.
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-user> --password-stdin
+docker push ghcr.io/<owner>/polishrr:with-web
+```
 
-#### 📋 Download & Upgrade Queues
-- See all **active downloads**, **tagged**, and **eligible items**.  
-- Clean, sortable tables with **clickable column headers**:  
-  - Click on **Name** or **Status** to sort ascending or descending.  
-  - Sorting preferences are remembered automatically.
+The Docker image is Linux-compatible because it is built from `python:3.12-slim` and uses Linux-native cron/Uvicorn inside the container.
 
-#### ⚙️ Settings Management
-- Adjust cron schedules, enable/disable Radarr or Sonarr processing, and set limits directly in the UI.  
-- Save and test configuration changes instantly.
+## License
 
-#### 💅 Modern Design
-- Fully responsive HTML/CSS interface.  
-- Styled with a **minimal dark theme**.  
-- Built using **Vanilla JS + FastAPI backend** — fast, lightweight, and local.
-
----
-
-### 🔒 Security
-- Access protected by a **Bearer token** (`POLISHRR_TOKEN` environment variable).  
-- Optional **IP allowlist** (`ALLOWED_IPS`) for restricted network access.  
-- Tokens are securely compared using constant-time checks.
-
----
-
-### 📄 License
-This project is released under the **MIT License**.  
-You are free to use, modify, and share it.
-
----
-
-### 🤖 About This Project
-This project’s code — including parts of the backend and web dashboard — was **mostly generated with AI assistance** and then **reviewed, analyzed, and refined by the author** for correctness, performance, and maintainability.
-
-
+MIT

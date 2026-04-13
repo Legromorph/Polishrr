@@ -1,3 +1,7 @@
 .venv
 .env
 script.sh
+__pycache__/
+*.pyc
+config/
+runtime/
