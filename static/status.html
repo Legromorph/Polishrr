@@ -2,33 +2,32 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <title>🎬 Polishrr Status</title>
+  <title>Polishrr Status</title>
   <link rel="stylesheet" href="assets/css/polishrr.css">
 </head>
 <body>
   <header class="app-header">
-    <h1 class="app-title">🎬 Polishrr Status</h1>
+    <h1 class="app-title">Polishrr Status</h1>
+    <button id="logout-btn" class="btn btn-primary" type="button">Logout</button>
   </header>
 
   <main class="app-main">
-
-        <section class="status-section">
-          <h2 class="section-title">📊 Upgrade Status</h2>
-          <div id="upgrade-summary" class="status-summary">Loading upgrade info...</div>
-          <div id="trigger-buttons">
-          <button id="trigger-upgrade" class="btn btn-primary">Trigger (both)</button>
-          <button id="trigger-radarr" class="btn btn-primary">Trigger (Radarr)</button>
-          <button id="trigger-sonarr" class="btn btn-primary">Trigger (Sonarr)</button>
-          </div>
-        </section>
+    <section class="status-section">
+      <h2 class="section-title">Upgrade Status</h2>
+      <div id="upgrade-summary" class="status-summary">Loading upgrade info...</div>
+      <div id="trigger-buttons">
+        <button id="trigger-upgrade" class="btn btn-primary" type="button">Trigger (both)</button>
+        <button id="trigger-radarr" class="btn btn-primary" type="button">Trigger (Radarr)</button>
+        <button id="trigger-sonarr" class="btn btn-primary" type="button">Trigger (Sonarr)</button>
+      </div>
+    </section>
 
     <section class="queue-section">
-      <h2 class="section-title">📥 Download Queue</h2>
-
+      <h2 class="section-title">Download Queue</h2>
       <div class="tabs">
-        <button class="tab-btn active" data-target="queue-all">Alle</button>
-        <button class="tab-btn" data-target="queue-tagged">Tagged</button>
-        <button class="tab-btn" data-target="queue-eligible">Eligible</button>
+        <button class="tab-btn active" data-target="queue-all" type="button">Alle</button>
+        <button class="tab-btn" data-target="queue-tagged" type="button">Tagged</button>
+        <button class="tab-btn" data-target="queue-eligible" type="button">Eligible</button>
       </div>
 
       <div id="queue-all" class="queue-tab active">Loading...</div>
@@ -38,12 +37,11 @@
 
     <div class="settings-log-wrapper">
       <div id="settings-section" class="settings-panel">
-        <h2>⚙️ Settings</h2>
+        <h2>Settings</h2>
 
         <div class="settings-group">
           <label for="cron-input">Cron Interval:</label>
           <input type="text" id="cron-input" placeholder="*/5 * * * *" title="Standard cron syntax: min hour day month weekday">
-          <button id="test-cron" class="btn-mini">🧪 Test Cron</button>
         </div>
 
         <div class="settings-group">
@@ -64,22 +62,21 @@
         </div>
 
         <div class="settings-actions">
-          <button id="save-settings" class="btn-primary">💾 Save Settings</button>
+          <button id="save-settings" class="btn-primary" type="button">Save Settings</button>
         </div>
       </div>
 
       <section class="log-section">
-        <h2 class="section-title">🧾 Log</h2>
+        <h2 class="section-title">Log</h2>
         <pre id="log-output" class="log-output"></pre>
       </section>
     </div>
-
   </main>
 
   <footer class="app-footer">
-    <small>Polishrr Status Panel — Inspired by Radarr/Sonarr</small>
+    <small>Polishrr Status Panel</small>
   </footer>
 
-  <script src="assets/js/polishrr.js"></script>
+  <script src="assets/js/dashboard.js"></script>
 </body>
 </html>
